@@ -1,0 +1,13 @@
+opencv-python
+numpy
+PyQt6
+torch
+torchvision
+PyYAML
+requests
+pandas
+seaborn
+matplotlib
+pillow
+tensorflow
+deepface
