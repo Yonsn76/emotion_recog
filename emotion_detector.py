@@ -8,6 +8,15 @@ class EmotionDetector:
     def __init__(self, model_type="haar"):
         self.model_type = model_type
         self.emotions = ['Feliz', 'Triste', 'Enojado', 'Sorprendido', 'Neutral']
+        self.emotion_translation = {
+            'angry': 'Enojado',
+            'disgust': 'Disgusto',
+            'fear': 'Miedo',
+            'happy': 'Feliz',
+            'sad': 'Triste',
+            'surprise': 'Sorprendido',
+            'neutral': 'Neutral'
+        }
         self.mediapipe_available = False
         
         # Inicializar detectores
@@ -54,40 +63,30 @@ class EmotionDetector:
             pass
 
     def get_emotion(self, face_img):
-        """Detecta la emoción en una imagen de rostro usando el modelo seleccionado"""
-        if self.model_type == "deepface":
-            try:
-                result = DeepFace.analyze(face_img, actions=['emotion'], enforce_detection=False)
-                if isinstance(result, list):
-                    emotion = result[0]['dominant_emotion']
-                else:
-                    emotion = result['dominant_emotion']
-                return emotion, 1.0
-            except Exception as e:
-                print(f"Error en DeepFace: {e}")
-                return "Neutral", 0.5
-        else:
-            # Para otros modelos, intentamos una detección simple basada en expresiones faciales
-            try:
-                gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
-                # Usar un clasificador simple para emociones (puede ser entrenado o predefinido)
-                # Aquí se usa un placeholder para detección simple
-                # Por ejemplo, usar un clasificador LBPH o similar si está disponible
-                # Por ahora, se usa una heurística simple basada en la intensidad de píxeles
-                mean_intensity = np.mean(gray)
-                if mean_intensity > 130:
-                    emotion = 'Feliz'
-                elif mean_intensity > 100:
-                    emotion = 'Neutral'
-                else:
-                    emotion = 'Triste'
-                confidence = 0.7
-                return emotion, confidence
-            except Exception as e:
-                print(f"Error en detección simple: {e}")
-                emotion = np.random.choice(self.emotions)
-                confidence = 0.5
-                return emotion, confidence
+        """Detecta la emoción en una imagen de rostro usando DeepFace.
+        Esta función ahora siempre usará DeepFace para una detección de emociones real,
+        independientemente del modelo usado para detectar el rostro.
+        """
+        try:
+            # Usamos DeepFace para analizar la emoción, sin forzar la detección de rostro
+            # ya que el rostro ya ha sido recortado por el detector principal (Haar, MediaPipe, etc.)
+            result = DeepFace.analyze(face_img, actions=['emotion'], enforce_detection=False)
+            
+            if isinstance(result, list):
+                # DeepFace puede devolver una lista de caras, tomamos la primera
+                emotion_en = result[0]['dominant_emotion']
+            else:
+                # O un solo diccionario si solo hay una cara
+                emotion_en = result['dominant_emotion']
+            
+            # Traducir emoción al español
+            emotion = self.emotion_translation.get(emotion_en, "Neutral")
+            return emotion, 1.0  # Devolvemos una confianza alta ya que DeepFace es preciso
+        except Exception as e:
+            # Si DeepFace falla (ej. no puede procesar la imagen), devolvemos Neutral.
+            # Esto puede pasar si el recorte del rostro es muy pequeño o no es claro.
+            # print(f"Advertencia en DeepFace: {e}")
+            return "Neutral", 0.5
 
     def detect_faces_haar(self, frame):
         """Detecta rostros usando Haar Cascade"""
@@ -188,9 +187,11 @@ class EmotionDetector:
             # Obtener emoción
             if self.model_type == "deepface" and analysis:
                 if isinstance(analysis, list) and len(analysis) > idx:
-                    emotion = analysis[idx]['dominant_emotion']
+                    emotion_en = analysis[idx]['dominant_emotion']
+                    emotion = self.emotion_translation.get(emotion_en, "Neutral")
                 elif not isinstance(analysis, list):
-                    emotion = analysis['dominant_emotion']
+                    emotion_en = analysis['dominant_emotion']
+                    emotion = self.emotion_translation.get(emotion_en, "Neutral")
                 else:
                     emotion, conf = self.get_emotion(face)
                 conf = 1.0
@@ -200,11 +201,11 @@ class EmotionDetector:
             # Dibujar bbox y etiqueta con estilo mejorado
             if self.model_type == "deepface":
                 color = (0, 0, 255)  # Rojo para DeepFace
-                text_color = (255, 255, 255)  # Blanco para el texto
+                text_color = (255, 0, 0)  # Azul para el texto
                 thickness = max(2, int((x2-x1) / 50))  # Texto más grueso para DeepFace
             else:
                 color = (0, 255, 0)  # Verde para otros modelos
-                text_color = (255, 255, 255)  # Blanco para el texto
+                text_color = (255, 0, 0)  # Azul para el texto
                 thickness = max(1, int((x2-x1) / 100))
             
             # Dibujar bbox
