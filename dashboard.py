@@ -12,6 +12,7 @@ from PyQt6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QRect, QP
 from emotion_detector import EmotionDetector
 
 class FlowLayout(QLayout):
+    """Un layout personalizado que organiza widgets en un flujo, similar al texto."""
     def __init__(self, parent=None, margin=0, spacing=-1):
         super(FlowLayout, self).__init__(parent)
         if parent is not None:
@@ -47,6 +48,7 @@ class FlowLayout(QLayout):
         return True
 
     def heightForWidth(self, width):
+        """Calcula la altura necesaria para un ancho determinado."""
         return self._do_layout(QRect(0, 0, width, 0), True)
 
     def setGeometry(self, rect):
@@ -65,6 +67,7 @@ class FlowLayout(QLayout):
         return size
 
     def _do_layout(self, rect, test_only):
+        """La lógica principal que posiciona los widgets en el layout."""
         x = rect.x()
         y = rect.y()
         line_height = 0
@@ -90,6 +93,7 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y()
 
 class ModelButton(QPushButton):
+    """Botón personalizado para seleccionar los modelos de detección."""
     def __init__(self, text, description, parent=None):
         super().__init__(parent)
         self.setObjectName("ModelButton")
@@ -155,6 +159,7 @@ class ModelButton(QPushButton):
         self.setGraphicsEffect(shadow)
 
 class InputButton(QPushButton):
+    """Botón de estilo personalizado para las opciones de entrada."""
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setObjectName("InputButton")
@@ -196,6 +201,7 @@ class InputButton(QPushButton):
         self.setGraphicsEffect(shadow)
 
 class VideoControls(QFrame):
+    """Un frame que contiene los controles de reproducción de video."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("VideoControls")
@@ -206,42 +212,42 @@ class VideoControls(QFrame):
         layout.setContentsMargins(10, 2, 10, 2)
         layout.setSpacing(10)
 
-        # Play/Pause button
+        # Botón de Play/Pausa
         self.play_pause_btn = QPushButton("▶")
         self.play_pause_btn.setCheckable(True)
         self.play_pause_btn.clicked.connect(self.update_play_pause_symbol)
 
-        # Rewind button
+        # Botón de retroceso
         self.rewind_btn = QPushButton("«")
 
-        # Forward button
+        # Botón de avance
         self.forward_btn = QPushButton("»")
 
-        # Stop button
+        # Botón de detener
         self.stop_btn = QPushButton("⏹")
 
-        # Fullscreen button
-        self.fullscreen_btn = QPushButton("⛶") # Unicode for fullscreen
+        # Botón de pantalla completa
+        self.fullscreen_btn = QPushButton("⛶")
 
-        # Time label
+        # Etiqueta de tiempo
         self.time_label = QLabel("00:00 / 00:00")
 
-        # Progress slider
+        # Deslizador de progreso
         self.progress_slider = QSlider(Qt.Orientation.Horizontal)
 
-        # Add widgets to layout
+        # Añadir widgets al layout
         layout.addWidget(self.rewind_btn)
         layout.addWidget(self.play_pause_btn)
         layout.addWidget(self.forward_btn)
         layout.addWidget(self.stop_btn)
         layout.addWidget(self.time_label)
-        layout.addWidget(self.progress_slider, 1)  # Stretch factor of 1
+        layout.addWidget(self.progress_slider, 1)
         layout.addWidget(self.fullscreen_btn)
 
         self.setLayout(layout)
         self.setFixedHeight(35)
 
-        # Modern, YouTube-like stylesheet
+        # Hoja de estilo moderna, similar a YouTube
         self.setStyleSheet("""
             QFrame#VideoControls {
                 background-color: transparent;
@@ -289,21 +295,22 @@ class VideoControls(QFrame):
         """)
 
     def update_play_pause_symbol(self):
+        """Actualiza el ícono del botón entre play y pausa."""
         if self.play_pause_btn.isChecked():
-            self.play_pause_btn.setText("⏸")  # Pause symbol
+            self.play_pause_btn.setText("⏸")
         else:
-            self.play_pause_btn.setText("▶")  # Play symbol
+            self.play_pause_btn.setText("▶")
 
 class EmotionDashboard(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Detector de Emociones")
-        self.detector = EmotionDetector(model_type="haar")
+        self.detector = EmotionDetector(model_type="mediapipe")
         self.cap = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
         self.is_webcam_active = False
-        self.current_model = "haar"
+        self.current_model = "mediapipe"
         self.video_paused = False
         self.total_frames = 0
         self.current_frame = 0
@@ -312,16 +319,16 @@ class EmotionDashboard(QWidget):
         self.controls_visible_before_fullscreen = True
         
         self.init_ui()
-        self.haar_btn.setChecked(True)
+        self.mediapipe_btn.setChecked(True)
 
     def showEvent(self, event):
-        """Force layout update on first show to fix initial positioning."""
+        """Fuerza la actualización del layout en la primera visualización para corregir la posición inicial."""
         super().showEvent(event)
-        # Defer the layout update to allow the main event loop to process initial events
+        # Difiere la actualización para permitir que el bucle de eventos procese los eventos iniciales.
         QTimer.singleShot(0, self.layout.update)
 
     def init_ui(self):
-        # Set window style
+        # Estilo de la ventana principal
         self.setStyleSheet("""
             QWidget {
                 background-color: #1e1e1e;
@@ -362,7 +369,7 @@ class EmotionDashboard(QWidget):
             }
         """)
 
-        # Main layout
+        # Layout principal
         self.layout = QVBoxLayout()
         self.layout.setSpacing(15)
         self.layout.setContentsMargins(25, 15, 25, 15)
@@ -373,7 +380,7 @@ class EmotionDashboard(QWidget):
         collapsible_controls_layout.setContentsMargins(0, 0, 0, 0)
         collapsible_controls_layout.setSpacing(15)
 
-        # --- Face Detector Selection Section ---
+        # --- Sección de Selección del Detector de Rostros ---
         face_detector_section = QFrame()
         face_detector_section.setObjectName("ModelSection")
         face_detector_layout = QVBoxLayout(face_detector_section)
@@ -382,7 +389,7 @@ class EmotionDashboard(QWidget):
         face_detector_title.setObjectName("SectionTitle")
         face_detector_layout.addWidget(face_detector_title)
         
-        face_buttons_layout = FlowLayout() # <-- Cambio a FlowLayout
+        face_buttons_layout = FlowLayout()
         face_buttons_layout.setSpacing(10)
         
         self.haar_btn = ModelButton("Haar Cascade", "Ligero y rápido")
@@ -403,7 +410,7 @@ class EmotionDashboard(QWidget):
         face_detector_layout.addLayout(face_buttons_layout)
         collapsible_controls_layout.addWidget(face_detector_section)
 
-        # --- Emotion Detector Section (Display Only) ---
+        # --- Sección del Detector de Emociones (Solo visualización) ---
         emotion_detector_section = QFrame()
         emotion_detector_layout = QVBoxLayout(emotion_detector_section)
         emotion_detector_layout.setSpacing(10)
@@ -427,7 +434,7 @@ class EmotionDashboard(QWidget):
         emotion_detector_layout.addWidget(emotion_model_label)
         collapsible_controls_layout.addWidget(emotion_detector_section)
 
-        # --- Input Selection Section ---
+        # --- Sección de Selección de Entrada ---
         input_section = QFrame()
         input_section.setObjectName("InputSection")
         input_layout = QVBoxLayout(input_section)
@@ -435,7 +442,7 @@ class EmotionDashboard(QWidget):
         input_title = QLabel("Selecciona Entrada")
         input_title.setObjectName("SectionTitle")
         input_layout.addWidget(input_title)
-        input_buttons_layout = FlowLayout() # <-- Cambio a FlowLayout
+        input_buttons_layout = FlowLayout()
         input_buttons_layout.setSpacing(10)
         self.webcam_btn = InputButton("Activar Cámara")
         self.webcam_btn.setProperty("primary", True)
@@ -447,11 +454,10 @@ class EmotionDashboard(QWidget):
         input_buttons_layout.addWidget(self.webcam_btn)
         input_buttons_layout.addWidget(self.upload_video_btn)
         input_buttons_layout.addWidget(self.upload_img_btn)
-        # input_buttons_layout.addStretch() # No es necesario con FlowLayout
         input_layout.addLayout(input_buttons_layout)
         collapsible_controls_layout.addWidget(input_section)
 
-        # Se añade el contenedor principal de controles al layout de la ventana.
+        # Añade el contenedor de controles al layout principal.
         self.layout.addWidget(self.collapsible_controls_frame)
 
         # --- Botón para Ocultar/Mostrar Controles ---
@@ -472,10 +478,7 @@ class EmotionDashboard(QWidget):
         self.toggle_button.clicked.connect(self.toggle_top_controls)
         self.layout.addWidget(self.toggle_button)
 
-        # --- Input Selection Section (MOVIDA) ---
-        # Esta sección ahora está dentro de 'self.collapsible_controls_frame'
-
-        # Preview Area
+        # --- Área de Previsualización ---
         self.preview_frame = QFrame()
         self.preview_frame.setObjectName("PreviewSection")
         preview_layout = QVBoxLayout(self.preview_frame)
@@ -487,12 +490,12 @@ class EmotionDashboard(QWidget):
         self.image_label.setMinimumSize(400, 300)
         preview_layout.addWidget(self.image_label)
         
-        # Add video controls (NUEVO DISEÑO)
+        # Añade los controles de video con el nuevo diseño.
         self.video_controls = VideoControls()
-        self.video_controls.setVisible(False)  # Hide initially
+        self.video_controls.setVisible(False)
         preview_layout.addWidget(self.video_controls)
         
-        # Connect video control signals
+        # Conecta las señales de los controles de video.
         self.video_controls.play_pause_btn.clicked.connect(self.toggle_play_pause)
         self.video_controls.rewind_btn.clicked.connect(self.rewind_video)
         self.video_controls.forward_btn.clicked.connect(self.forward_video)
@@ -505,7 +508,6 @@ class EmotionDashboard(QWidget):
         self.setMinimumSize(850, 650)
 
         # --- Animación para los controles superiores ---
-        # La animación ahora se aplica al contenedor de todos los controles colapsables.
         self.animation = QPropertyAnimation(self.collapsible_controls_frame, b"maximumHeight")
         self.animation.setDuration(300)
         self.animation.setEasingCurve(QEasingCurve.Type.InOutQuart)
@@ -524,23 +526,23 @@ class EmotionDashboard(QWidget):
         self.animation.setStartValue(start_height)
         self.animation.setEndValue(end_height)
         
-        # Hide the frame after the animation finishes if we are collapsing it
+        # Oculta el frame cuando la animación de colapso termina.
         if end_height == 0:
-            # Use a lambda to avoid issues with disconnecting a non-existent connection
             self.animation.finished.connect(lambda: self.collapsible_controls_frame.setVisible(False))
         else:
-            # Disconnect any previous connection to avoid hiding on expand
+            # Desconecta la señal para evitar que se oculte al expandir.
             try:
                 self.animation.finished.disconnect()
             except (TypeError, RuntimeError):
-                pass # No connection to disconnect or object already deleted
+                pass
 
         self.animation.start()
 
     def toggle_fullscreen(self):
+        """Activa o desactiva el modo de pantalla completa."""
         if self.is_fullscreen:
             self.showNormal()
-            # Restaurar la visibilidad de los controles
+            # Restaura la visibilidad de los controles.
             self.toggle_button.setVisible(True)
             if self.controls_visible_before_fullscreen:
                 self.collapsible_controls_frame.setVisible(True)
@@ -549,16 +551,17 @@ class EmotionDashboard(QWidget):
             self.video_controls.fullscreen_btn.setText("⛶")
         else:
             self.is_fullscreen = True
-            # Guardar el estado actual de los controles
+            # Guarda el estado de visibilidad de los controles.
             self.controls_visible_before_fullscreen = self.collapsible_controls_frame.isVisible()
             
             self.showFullScreen()
-            # Ocultar otros widgets
+            # Oculta otros widgets para una experiencia inmersiva.
             self.toggle_button.setVisible(False)
             self.collapsible_controls_frame.setVisible(False)
             self.video_controls.fullscreen_btn.setText("Exit")
 
     def keyPressEvent(self, event):
+        """Maneja el evento de presionar una tecla, para salir de pantalla completa con ESC."""
         if event.key() == Qt.Key.Key_Escape and self.is_fullscreen:
             self.toggle_fullscreen()
         else:
@@ -584,24 +587,22 @@ class EmotionDashboard(QWidget):
             self.video_controls.setVisible(False)
 
     def change_model(self, model_name):
+        """Cambia el modelo de detección de rostros."""
         if self.detector.change_model(model_name):
             self.current_model = model_name
-            # Actualizar el estado de los botones
+            # Actualiza el estado visual de los botones de modelo.
             self.haar_btn.setChecked(model_name == "haar")
             self.yolo_btn.setChecked(model_name == "yolo")
             self.mediapipe_btn.setChecked(model_name == "mediapipe")
-
-            # No es necesario reiniciar la cámara web, el modelo se aplicará en el siguiente frame.
-            # if self.is_webcam_active:
-            #     self.toggle_webcam() # Esto detenía y reiniciaba, innecesario.
         else:
             QMessageBox.warning(self, "Error", f"Modelo desconocido: {model_name}")
 
     def toggle_webcam(self):
+        """Inicia o detiene la captura de la cámara web."""
         if self.is_webcam_active:
             self._stop_current_media()
         else:
-            self._stop_current_media()  # Detener cualquier video/imagen antes de iniciar la cámara
+            self._stop_current_media()
 
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():
@@ -610,9 +611,10 @@ class EmotionDashboard(QWidget):
             self.is_webcam_active = True
             self.webcam_btn.setText("Detener Cámara")
             self.timer.start(30)
-            self.video_controls.setVisible(False) # Hide video controls for webcam
+            self.video_controls.setVisible(False)
 
     def update_frame(self):
+        """Se ejecuta con cada tick del QTimer para procesar y mostrar un nuevo frame."""
         if self.video_paused and not self.is_webcam_active:
             return
             
@@ -621,11 +623,11 @@ class EmotionDashboard(QWidget):
             self.timer.stop()
             if self.is_webcam_active:
                 self.toggle_webcam()
-            else: # End of video file
+            else: # Fin del archivo de video
                 self.stop_video()
             return
         
-        # Asegurarse de que el frame no esté vacío
+        # Asegura que el frame no esté vacío.
         if frame is None or frame.size == 0:
             return
 
@@ -641,15 +643,15 @@ class EmotionDashboard(QWidget):
             Qt.TransformationMode.SmoothTransformation
         ))
         
-        # Update progress slider and time label for video playback
+        # Actualiza el deslizador de progreso y la etiqueta de tiempo para videos.
         if self.cap and self.total_frames > 0 and not self.is_webcam_active:
             self.current_frame = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
             
-            # Update slider
+            # Actualiza el deslizador.
             progress = int((self.current_frame / self.total_frames) * 100) if self.total_frames > 0 else 0
             self.video_controls.progress_slider.setValue(progress)
 
-            # Update time label
+            # Actualiza la etiqueta de tiempo.
             if self.video_fps > 0:
                 current_sec = self.current_frame / self.video_fps
                 total_sec = self.total_frames / self.video_fps
@@ -660,6 +662,7 @@ class EmotionDashboard(QWidget):
                 self.video_controls.time_label.setText(f"{current_time_str} / {total_time_str}")
 
     def upload_image(self):
+        """Abre un diálogo para que el usuario seleccione una imagen y la procesa."""
         self._stop_current_media()
 
         file_path, _ = QFileDialog.getOpenFileName(
@@ -688,6 +691,7 @@ class EmotionDashboard(QWidget):
             ))
 
     def upload_video(self):
+        """Abre un diálogo para que el usuario seleccione un video y comienza la reproducción."""
         self._stop_current_media()
         
         file_path, _ = QFileDialog.getOpenFileName(
@@ -698,13 +702,13 @@ class EmotionDashboard(QWidget):
         )
         
         if file_path:
-            self.is_webcam_active = False # Ensure webcam mode is off
+            self.is_webcam_active = False
             self.cap = cv2.VideoCapture(file_path)
             if not self.cap.isOpened():
                 QMessageBox.warning(self, "Error", "No se pudo cargar el video")
                 return
                 
-            # Get video properties
+            # Obtiene las propiedades del video.
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.video_fps = self.cap.get(cv2.CAP_PROP_FPS)
             self.current_frame = 0
@@ -713,11 +717,12 @@ class EmotionDashboard(QWidget):
             self.webcam_btn.setText("Activar Cámara")
             self.video_controls.setVisible(True)
             self.video_paused = False
-            self.video_controls.play_pause_btn.setChecked(True) # Set to playing state
+            self.video_controls.play_pause_btn.setChecked(True)
             self.video_controls.update_play_pause_symbol()
             self.timer.start(int(1000 / self.video_fps) if self.video_fps > 0 else 30)
 
     def toggle_play_pause(self):
+        """Pausa o reanuda la reproducción del video."""
         if not self.is_webcam_active and self.cap:
             if self.video_paused:
                 self.timer.start(int(1000 / self.video_fps) if self.video_fps > 0 else 30)
@@ -728,36 +733,40 @@ class EmotionDashboard(QWidget):
             self.video_controls.update_play_pause_symbol()
 
     def stop_video(self):
+        """Detiene el video y lo reinicia al principio."""
         self.timer.stop()
         if self.cap and self.total_frames > 0:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             self.current_frame = 0
             self.video_controls.progress_slider.setValue(0)
             self.video_paused = True
-            self.video_controls.play_pause_btn.setChecked(False) # Set to paused state
+            self.video_controls.play_pause_btn.setChecked(False)
             self.video_controls.update_play_pause_symbol()
-            # Show first frame
+            # Muestra el primer frame.
             self.update_frame()
             self.video_paused = True
 
 
     def rewind_video(self):
+        """Retrocede el video 5 segundos."""
         if self.cap and self.total_frames > 0:
             fps = self.video_fps if self.video_fps > 0 else 30
             current = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
-            new_pos = max(0, current - (5 * fps))  # Rewind 5 seconds
+            new_pos = max(0, current - (5 * fps))
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, new_pos)
             self.update_frame()
 
     def forward_video(self):
+        """Adelanta el video 5 segundos."""
         if self.cap and self.total_frames > 0:
             fps = self.video_fps if self.video_fps > 0 else 30
             current = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
-            new_pos = min(self.total_frames - 1, current + (5 * fps))  # Forward 5 seconds
+            new_pos = min(self.total_frames - 1, current + (5 * fps))
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, new_pos)
             self.update_frame()
 
     def seek_video(self, value):
+        """Busca una posición específica en el video según el valor del deslizador."""
         if self.cap and self.total_frames > 0:
             frame_pos = int((value / 100) * self.total_frames)
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
@@ -765,6 +774,7 @@ class EmotionDashboard(QWidget):
             self.update_frame()
 
     def closeEvent(self, event):
+        """Se asegura de liberar los recursos al cerrar la aplicación."""
         self.timer.stop()
         if self.cap:
             self.cap.release()
@@ -773,5 +783,5 @@ class EmotionDashboard(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = EmotionDashboard()
-    window.showMaximized() # Show the window maximized
+    window.showMaximized()
     sys.exit(app.exec())

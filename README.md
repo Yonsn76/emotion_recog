@@ -1,57 +1,95 @@
-# Sistema de Reconocimiento de Emociones
+# Sistema de Reconocimiento de Emociones con IA
 
-Este proyecto implementa un sistema de reconocimiento de emociones con una interfaz gráfica moderna que permite detectar emociones tanto en tiempo real (webcam) como en imágenes y videos, utilizando múltiples modelos de detección facial.
+Una aplicación de escritorio moderna y responsiva desarrollada en Python y PyQt6 para detectar emociones faciales en tiempo real a través de la cámara web, imágenes estáticas o archivos de video.
 
-## Características
+Este proyecto fue diseñado como una herramienta de apoyo para el entorno educativo de **SENATI**, permitiendo a los instructores obtener una mejor comprensión del estado emocional de los estudiantes.
 
-- Interfaz gráfica moderna con PyQt6
-- Múltiples modelos de detección facial:
-  * **Haar Cascade**: Rápido y ligero, ideal para sistemas con recursos limitados
-  * **YOLOv5**: Alta precisión, modelo rápido y preciso
-  * **DeepFace**: Basado en aprendizaje profundo
-  * **MediaPipe**: Buen balance entre precisión y rendimiento
-- Clasificación de 5 emociones básicas:
-  - Felicidad
-  - Tristeza
-  - Enojo
-  - Sorpresa
-  - Neutral
-- Soporte para webcam en tiempo real
-- Soporte para análisis de imágenes y videos
-- Efecto visual de selección para cada modelo
-- Mensajes y textos en español
+---
 
-## Requisitos
+## 📋 Características Principales
 
-- Python 3.8 o superior
-- OpenCV
-- NumPy
-- PyQt6
-- PyTorch y torchvision (para YOLO/DeepFace)
-- Otras dependencias listadas en requirements.txt
-- Webcam (para detección en tiempo real)
+*   **Interfaz Gráfica Moderna:** UI intuitiva, responsiva y de aspecto profesional construida con PyQt6.
+*   **Múltiples Fuentes de Análisis:**
+    *   Cámara web en tiempo real.
+    *   Archivos de imagen (JPG, PNG).
+    *   Archivos de video (MP4, AVI).
+*   **Selección de Modelos de Detección Facial:**
+    *   **Haar Cascade:** Rápido y ligero, ideal para hardware con recursos limitados.
+    *   **YOLOv5:** Alta precisión, recomendado para un seguimiento robusto.
+    *   **MediaPipe:** Excelente balance entre rendimiento y precisión.
+*   **Análisis de Emociones con DeepFace:** Utiliza la potente librería `DeepFace` para un análisis de emociones preciso, reconociendo 7 estados emocionales (feliz, triste, enojado, sorprendido, neutral, miedo, disgusto).
+*   **Controles de Video Avanzados:** Controles de reproducción de video inspirados en YouTube, con barra de progreso, pausa, reanudación y control de tiempo.
 
+---
 
-2. Descarga el modelo yolov5x.pt y colócalo en la carpeta principal del proyecto (si usas YOLO).
+## 🛠️ Tecnologías Utilizadas
 
-3. Instala las dependencias:
+*   **Lenguaje:** Python 3.8
+*   **Interfaz Gráfica:** PyQt6
+*   **Procesamiento de Imagen/Video:** OpenCV
+*   **Detección de Rostros:** Haar Cascade (OpenCV), YOLOv5 (PyTorch), MediaPipe
+*   **Análisis de Emociones:** DeepFace
+
+---
+
+## 🚀 Cómo Empezar
+
+Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local.
+
+### 1. Prerrequisitos
+
+*   [Python 3.8](https://www.python.org/downloads/release/python-380/)
+*   [Git](https://git-scm.com/downloads)
+*   Una cámara web (para el análisis en tiempo real).
+
+### 2. Instalación
+
+**a. Clona el repositorio:**
+
 ```bash
-py -m pip install -r requirements.txt
+git clone https://github.com/Yonsn76/emotion_recog.git
+cd emotion_recog
 ```
 
-## Uso
+**b. Crea y activa un entorno virtual (recomendado):**
 
-1. Ejecuta el dashboard:
 ```bash
-py dashboard.py
+# Crear el entorno
+py -m venv venv
+
+# Activar en Windows
+.\venv\Scripts\activate
 ```
 
-2. En la interfaz gráfica, tienes las siguientes opciones:
-   - Selecciona el modelo de detección (Haar, YOLOv5, DeepFace, MediaPipe)
-   - Haz clic en "Activar Cámara" para iniciar/detener la detección en tiempo real
-   - Haz clic en "Subir Imagen" para seleccionar una imagen y detectar emociones en ella
-   - Haz clic en "Subir Video" para analizar emociones en un video
+**c. Instala las dependencias:**
 
-3. Para cerrar el programa:
-   - Cierra la ventana del dashboard
-   - O presiona Ctrl+C en la terminal
+Asegúrate de que tu entorno virtual esté activado y luego ejecuta:
+
+```bash
+pip install -r requirements.txt
+```
+
+**d. Descarga el modelo YOLOv5 (Opcional pero recomendado para alta precisión):**
+
+Si deseas utilizar el detector de rostros YOLOv5, descarga el archivo de pesos `yolov5x.pt` y colócalo en la carpeta raíz del proyecto.
+
+*   Puedes descargarlo desde la [página de releases de YOLOv5](https://github.com/ultralytics/yolov5/releases).
+
+---
+
+## ▶️ Uso
+
+Una vez que la instalación esté completa, puedes iniciar la aplicación.
+
+1.  **Ejecuta el dashboard:**
+
+    ```bash
+    py dashboard.py
+    ```
+
+2.  **Interactúa con la interfaz:**
+    *   **Selecciona un Modelo:** En la parte superior, elige el modelo de detección de rostros que prefieras (MediaPipe es el recomendado por defecto).
+    *   **Activar Cámara:** Inicia la detección de emociones en tiempo real.
+    *   **Subir Imagen:** Analiza una imagen estática.
+    *   **Subir Video:** Carga un archivo de video para su análisis.
+

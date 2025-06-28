@@ -5,9 +5,18 @@ from pathlib import Path
 from deepface import DeepFace
 
 class EmotionDetector:
+    """
+    Clase para detectar rostros y analizar emociones en imágenes y video.
+    Utiliza diferentes modelos para la detección de rostros (Haar Cascade, YOLOv5, MediaPipe)
+    y DeepFace para el análisis de emociones.
+    """
     def __init__(self, model_type="haar"):
+        """
+        Inicializa el detector de emociones.
+        Args:
+            model_type (str): El modelo de detección de rostros a usar ('haar', 'yolo', 'mediapipe').
+        """
         self.model_type = model_type
-        self.emotions = ['Feliz', 'Triste', 'Enojado', 'Sorprendido', 'Neutral']
         self.emotion_translation = {
             'angry': 'Enojado',
             'disgust': 'Disgusto',
@@ -19,28 +28,27 @@ class EmotionDetector:
         }
         self.mediapipe_available = False
         
-        # Inicializar detectores
         self.init_detectors()
 
     def init_detectors(self):
-        """Inicializa los detectores según el modelo seleccionado"""
+        """Inicializa los detectores de rostros según el modelo seleccionado."""
         if self.model_type == "haar":
             self.detector = cv2.CascadeClassifier(
                 cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             )
         elif self.model_type == "yolo":
             try:
-                # Cargar YOLOv5 desde el archivo de pesos
+                # Carga el modelo YOLOv5 desde un archivo local o de torch.hub
                 model_path = 'yolov5x.pt'
                 if not Path(model_path).exists():
-                    raise FileNotFoundError(f"No se encontró el modelo en {model_path}")
+                    raise FileNotFoundError(f"No se encontró el modelo YOLO en {model_path}")
                 self.detector = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, source='github')
-                self.detector.classes = [0]  # Solo detectar personas
-                # Intentar warmup para evitar errores de controlador
+                self.detector.classes = [0]  # Configura para detectar solo personas
+                # Realiza una inferencia inicial para calentar el modelo y evitar cuelgues.
                 _ = self.detector(torch.zeros(1, 3, 640, 640))
             except Exception as e:
-                print(f"Error al cargar YOLO: {e}")
-                print("Usando Haar Cascade como alternativa.")
+                print(f"Error al cargar YOLOv5: {e}")
+                print("Se utilizará Haar Cascade como alternativa.")
                 self.model_type = "haar"
                 self.detector = cv2.CascadeClassifier(
                     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -54,197 +62,131 @@ class EmotionDetector:
                 )
                 self.mediapipe_available = True
             except ImportError:
-                print("MediaPipe no está disponible. Usando Haar Cascade como alternativa.")
+                print("MediaPipe no está instalado. Se utilizará Haar Cascade como alternativa.")
                 self.model_type = "haar"
                 self.detector = cv2.CascadeClassifier(
                     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
                 )
         elif self.model_type == "deepface":
+            # DeepFace se usa solo para el análisis de emoción independientemente del detector de rostros.
             pass
 
     def get_emotion(self, face_img):
-        """Detecta la emoción en una imagen de rostro usando DeepFace.
-        Esta función ahora siempre usará DeepFace para una detección de emociones real,
-        independientemente del modelo usado para detectar el rostro.
+        """
+        Detecta la emoción en una imagen de rostro usando DeepFace.
+        DeepFace se usa para el análisis de emoción independientemente del detector de rostros.
         """
         try:
-            # Usamos DeepFace para analizar la emoción, sin forzar la detección de rostro
-            # ya que el rostro ya ha sido recortado por el detector principal (Haar, MediaPipe, etc.)
+            # Analiza la emoción en el rostro ya recortado.
             result = DeepFace.analyze(face_img, actions=['emotion'], enforce_detection=False)
             
             if isinstance(result, list):
-                # DeepFace puede devolver una lista de caras, tomamos la primera
                 emotion_en = result[0]['dominant_emotion']
             else:
-                # O un solo diccionario si solo hay una cara
                 emotion_en = result['dominant_emotion']
             
-            # Traducir emoción al español
             emotion = self.emotion_translation.get(emotion_en, "Neutral")
-            return emotion, 1.0  # Devolvemos una confianza alta ya que DeepFace es preciso
-        except Exception as e:
-            # Si DeepFace falla (ej. no puede procesar la imagen), devolvemos Neutral.
-            # Esto puede pasar si el recorte del rostro es muy pequeño o no es claro.
+            return emotion, 1.0
+        except Exception:
+            # Si DeepFace falla (ej. rostro no claro), devuelve 'Neutral'.
             # print(f"Advertencia en DeepFace: {e}")
             return "Neutral", 0.5
 
     def detect_faces_haar(self, frame):
-        """Detecta rostros usando Haar Cascade"""
+        """Detecta rostros usando Haar Cascade y devuelve las coordenadas."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = self.detector.detectMultiScale(
             gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
         )
-        # Mejoramos la detección ajustando los parámetros
-        if len(faces) == 0:
-            # Si no se detectan rostros, intentamos con parámetros más permisivos
-            faces = self.detector.detectMultiScale(
-                gray, scaleFactor=1.05, minNeighbors=3, minSize=(20, 20)
-            )
-        return [(x, y, x+w, y+h) for (x, y, w, h) in faces]
+        return faces
 
     def detect_faces_yolo(self, frame):
-        """Detecta rostros usando YOLOv5"""
+        """Detecta rostros usando YOLOv5 y devuelve las coordenadas."""
         results = self.detector(frame)
+        detections = results.xyxy[0].cpu().numpy()
         faces = []
-        for det in results.xyxy[0]:
-            if det[-1] == 0:  # Si es una persona
-                x1, y1, x2, y2 = map(int, det[:4])
-                faces.append((x1, y1, x2, y2))
+        for *box, conf, cls in detections:
+            if conf > 0.5:
+                x1, y1, x2, y2 = map(int, box)
+                w, h = x2 - x1, y2 - y1
+                faces.append((x1, y1, w, h))
         return faces
 
     def detect_faces_mediapipe(self, frame):
-        """Detecta rostros usando MediaPipe"""
+        """Detecta rostros usando MediaPipe y devuelve las coordenadas."""
         if not self.mediapipe_available:
-            return self.detect_faces_haar(frame)
-            
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.detector.process(frame_rgb)
+            return []
+        
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.detector.process(img_rgb)
+        
         faces = []
         if results.detections:
+            h, w, _ = frame.shape
             for detection in results.detections:
-                bbox = detection.location_data.relative_bounding_box
-                h, w, _ = frame.shape
-                x1 = int(bbox.xmin * w)
-                y1 = int(bbox.ymin * h)
-                x2 = int((bbox.xmin + bbox.width) * w)
-                y2 = int((bbox.ymin + bbox.height) * h)
-                faces.append((x1, y1, x2, y2))
+                box = detection.location_data.relative_bounding_box
+                x, y, width, height = int(box.xmin * w), int(box.ymin * h), int(box.width * w), int(box.height * h)
+                faces.append((x, y, width, height))
         return faces
 
-    def detect_faces_deepface(self, frame):
-        """Detecta rostros y emociones usando DeepFace"""
-        try:
-            analysis = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
-            faces = []
-            if isinstance(analysis, list):
-                for face in analysis:
-                    region = face['region']
-                    x1, y1 = region['x'], region['y']
-                    x2, y2 = x1 + region['w'], y1 + region['h']
-                    faces.append((x1, y1, x2, y2))
-            else:
-                region = analysis['region']
-                x1, y1 = region['x'], region['y']
-                x2, y2 = x1 + region['w'], y1 + region['h']
-                faces.append((x1, y1, x2, y2))
-            return faces, analysis
-        except Exception as e:
-            print(f"Error en DeepFace: {e}")
-            return [], None
-
     def process_frame(self, frame):
-        """Procesa un frame para detectar rostros y emociones"""
-        if frame is None or frame.size == 0:
-            return frame
-
-        # Hacer una copia del frame para no modificar el original
-        output_frame = frame.copy()
-        
+        """
+        Procesa un frame de video o una imagen: detecta rostros y sus emociones.
+        Dibuja los resultados en el frame y lo devuelve.
+        """
         if self.model_type == "haar":
             faces = self.detect_faces_haar(frame)
-            analysis = None
         elif self.model_type == "yolo":
             faces = self.detect_faces_yolo(frame)
-            analysis = None
-        elif self.model_type == "deepface":
-            faces, analysis = self.detect_faces_deepface(frame)
-        else:  # mediapipe
+        elif self.model_type == "mediapipe":
             faces = self.detect_faces_mediapipe(frame)
-            analysis = None
+        else:
+            faces = []
 
-        for idx, (x1, y1, x2, y2) in enumerate(faces):
-            # Extraer región del rostro con un margen
-            margin = 20
-            y1_m = max(0, y1 - margin)
-            y2_m = min(frame.shape[0], y2 + margin)
-            x1_m = max(0, x1 - margin)
-            x2_m = min(frame.shape[1], x2 + margin)
-            face = frame[y1_m:y2_m, x1_m:x2_m]
+        for (x, y, w, h) in faces:
+            # Asegura que las coordenadas no excedan los límites del frame.
+            x, y, w, h = max(0, x), max(0, y), max(0, w), max(0, h)
             
-            if face.size == 0:
+            # Recorta el rostro para el análisis de emoción.
+            face_img = frame[y:y+h, x:x+w]
+
+            if face_img.size == 0:
                 continue
 
-            # Obtener emoción
-            if self.model_type == "deepface" and analysis:
-                if isinstance(analysis, list) and len(analysis) > idx:
-                    emotion_en = analysis[idx]['dominant_emotion']
-                    emotion = self.emotion_translation.get(emotion_en, "Neutral")
-                elif not isinstance(analysis, list):
-                    emotion_en = analysis['dominant_emotion']
-                    emotion = self.emotion_translation.get(emotion_en, "Neutral")
-                else:
-                    emotion, conf = self.get_emotion(face)
-                conf = 1.0
-            else:
-                emotion, conf = self.get_emotion(face)
+            emotion, confidence = self.get_emotion(face_img)
+            
+            # Dibuja el rectángulo y el texto de la emoción en el frame.
+            color = (0, 255, 0) if confidence > 0.6 else (0, 165, 255)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+            
+            text = f"{emotion}"
+            
+            # Calcula el tamaño del texto para el fondo.
+            (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)
+            
+            # Dibuja un fondo oscuro para el texto.
+            cv2.rectangle(frame, (x, y - text_height - 10), (x + text_width, y), (0, 0, 0), -1)
+            
+            # Dibuja el texto de la emoción.
+            cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
 
-            # Dibujar bbox y etiqueta con estilo mejorado
-            if self.model_type == "deepface":
-                color = (0, 0, 255)  # Rojo para DeepFace
-                text_color = (255, 0, 0)  # Azul para el texto
-                thickness = max(2, int((x2-x1) / 50))  # Texto más grueso para DeepFace
-            else:
-                color = (0, 255, 0)  # Verde para otros modelos
-                text_color = (255, 0, 0)  # Azul para el texto
-                thickness = max(1, int((x2-x1) / 100))
-            
-            # Dibujar bbox
-            cv2.rectangle(output_frame, (x1, y1), (x2, y2), color, thickness)
-            
-            # Preparar el texto
-            label = f'{emotion} ({conf:.2f})'
-            font_scale = (x2-x1) / 200  # Escala proporcional al tamaño del rostro
-            if self.model_type == "deepface":
-                font_scale = min(max(0.7, font_scale), 1.2)  # Límites más altos para DeepFace
-            else:
-                font_scale = min(max(0.5, font_scale), 1.0)  # Límites normales para otros modelos
-            
-            # Obtener el tamaño del texto para el fondo
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
-            
-            # Dibujar fondo para el texto
-            cv2.rectangle(output_frame, 
-                        (x1, y1-text_height-baseline-5),
-                        (x1+text_width, y1),
-                        color, -1)
-            
-            # Dibujar el texto
-            cv2.putText(output_frame, label,
-                       (x1, y1-baseline-5),
-                       cv2.FONT_HERSHEY_SIMPLEX,
-                       font_scale, text_color, thickness)
+        return frame
 
-        return output_frame
-
-    def change_model(self, model_type):
-        """Cambia el modelo de detección"""
-        if model_type in ["haar", "yolo", "mediapipe", "deepface"]:
-            self.model_type = model_type
+    def change_model(self, model_name):
+        """
+        Cambia dinámicamente el modelo de detección de rostros.
+        Retorna True si el cambio fue exitoso, False en caso contrario.
+        """
+        if model_name not in ["haar", "yolo", "mediapipe"]:
+            return False
+        
+        self.model_type = model_name
+        try:
             self.init_detectors()
             return True
-        return False
-
-    def is_mediapipe_available(self):
-        """Verifica si MediaPipe está disponible"""
-        return self.mediapipe_available
+        except Exception as e:
+            print(f"Error al cambiar al modelo {model_name}: {e}")
+            # Si falla, revierte a Haar Cascade como modelo seguro.
+            self.model_type = "haar"
+            self.init_detectors()
+            return False
