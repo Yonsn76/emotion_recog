@@ -42,7 +42,7 @@ class EmotionDetector:
                 # Buscar el modelo en el mismo directorio que este archivo
                 current_dir = Path(__file__).parent
                 model_path = str(current_dir / 'yolov8n-face.pt')
-                print(f"[EmotionDetector] Buscando modelo YOLO en: {model_path}")
+                print(f"[EmotionDetector] Buscando modelo YOLOv8n-face en: {model_path}")
                 
                 # Cargar el modelo, si no existe se intentará descargar
                 self.detector = YOLO(model_path)
@@ -132,9 +132,16 @@ class EmotionDetector:
         """
         Procesa un frame de video o una imagen: detecta rostros y sus emociones.
         Si el modelo es YOLO, dibuja los resultados y muestra la emoción dominante sobre cada rostro.
+        Optimizado para resolución media y fluidez.
         """
         if frame is None or frame.size == 0:
             return frame
+        # --- Reescalar a resolución media (máx 640x480) ---
+        h, w = frame.shape[:2]
+        max_w, max_h = 640, 480
+        scale = min(max_w / w, max_h / h, 1.0)
+        if scale < 1.0:
+            frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
         try:
             if self.model_type == "yolo":
                 results = self.detector(frame)
@@ -143,22 +150,27 @@ class EmotionDetector:
                     x1, y1, x2, y2 = map(int, box)
                     face_img = frame[y1:y2, x1:x2]
                     if face_img.size > 0:
+                        # --- Reescalar rostro a 224x224 para DeepFace ---
+                        face_resized = cv2.resize(face_img, (224, 224), interpolation=cv2.INTER_AREA)
                         try:
-                            emotion = DeepFace.analyze(face_img, actions=['emotion'], enforce_detection=False)
+                            emotion = DeepFace.analyze(face_resized, actions=['emotion'], enforce_detection=False)
                             emotion_label = emotion[0]['dominant_emotion'] if isinstance(emotion, list) else emotion['dominant_emotion']
                             emotion_label = self.emotion_translation.get(emotion_label.lower(), emotion_label)
-                            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0,255,0), 2)
-                            cv2.putText(annotated, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
-                        except Exception as e:
+                            color = (200, 120, 255)  # Morado claro (BGR)
+                            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+                            cv2.putText(annotated, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                        except Exception:
                             cv2.putText(annotated, 'Error', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
                 return annotated
             elif self.model_type == "haar":
                 faces = self.detect_faces_haar(frame)
+                color = (255, 200, 100)  # Celeste (BGR)
             elif self.model_type == "mediapipe":
                 faces = self.detect_faces_mediapipe(frame)
+                color = (80, 220, 80)  # Verde (BGR)
             else:
                 faces = []
-
+                color = (0, 255, 0)
             for (x, y, w, h) in faces:
                 h_frame, w_frame = frame.shape[:2]
                 x = max(0, min(x, w_frame - 1))
@@ -168,15 +180,17 @@ class EmotionDetector:
                 face_img = frame[y:y+h, x:x+w]
                 if face_img.size == 0:
                     continue
-                emotion, confidence = self.get_emotion(face_img)
-                color = (0, 255, 0) if confidence > 0.6 else (0, 165, 255)
+                # --- Reescalar rostro a 224x224 para DeepFace ---
+                face_resized = cv2.resize(face_img, (224, 224), interpolation=cv2.INTER_AREA)
+                emotion, confidence = self.get_emotion(face_resized)
                 cv2.rectangle(frame, (x, y), (x+w, y+h), color, 4)
                 text = f"{emotion}"
                 (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
                 cv2.rectangle(frame, (x, y - text_height - 15), (x + text_width, y), (0, 0, 0), -1)
-                cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 4)
+                cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 4)
         except Exception:
-            return frame
+            # Solo mostrar error amigable, no traceback
+            pass
         return frame
 
     def change_model(self, model_name):
