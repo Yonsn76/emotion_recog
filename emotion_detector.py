@@ -156,7 +156,7 @@ class EmotionDetector:
                             emotion = DeepFace.analyze(face_resized, actions=['emotion'], enforce_detection=False)
                             emotion_label = emotion[0]['dominant_emotion'] if isinstance(emotion, list) else emotion['dominant_emotion']
                             emotion_label = self.emotion_translation.get(emotion_label.lower(), emotion_label)
-                            color = (200, 120, 255)  # Morado claro (BGR)
+                            color = (0, 140, 255)  # Naranja (BGR)
                             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
                             cv2.putText(annotated, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
                         except Exception:
@@ -183,11 +183,10 @@ class EmotionDetector:
                 # --- Reescalar rostro a 224x224 para DeepFace ---
                 face_resized = cv2.resize(face_img, (224, 224), interpolation=cv2.INTER_AREA)
                 emotion, confidence = self.get_emotion(face_resized)
-                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 4)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
                 text = f"{emotion}"
-                (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
-                cv2.rectangle(frame, (x, y - text_height - 15), (x + text_width, y), (0, 0, 0), -1)
-                cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 4)
+                (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)
+                cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
         except Exception:
             # Solo mostrar error amigable, no traceback
             pass

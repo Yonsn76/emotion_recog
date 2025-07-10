@@ -10,6 +10,7 @@ from PyQt6.QtGui import QImage, QPixmap, QColor, QPalette, QIcon
 from PyQt6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QRect, QPoint, QSize, QEvent
 from pathlib import Path
 from emotion_detector import EmotionDetector
+import time
 
 class FlowLayout(QLayout):
     """Un layout personalizado que organiza widgets en un flujo, similar al texto."""
@@ -118,7 +119,7 @@ class ModelButton(QPushButton):
 
         self.setCheckable(True)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.setMinimumWidth(130)
+        self.setMinimumWidth(220)
         self.setMinimumHeight(60)
         self.setStyleSheet("""
             QPushButton#ModelButton {
@@ -130,6 +131,7 @@ class ModelButton(QPushButton):
                 font-size: 15px;
                 font-weight: 600;
                 text-align: center;
+                min-width: 220px;
             }
             QPushButton#ModelButton:hover {
                 background-color: #3a3a3a;
@@ -285,15 +287,6 @@ class VideoControls(QFrame):
                 border-radius: 3px;
             }
         """)
-
-        from PyQt6.QtWidgets import QMenu
-        self.speed_menu = QMenu()
-        self.speed_menu.addAction("0.5x", lambda: self.parent().set_playback_speed(0.5))
-        self.speed_menu.addAction("1x", lambda: self.parent().set_playback_speed(1.0))
-        self.speed_menu.addAction("1.5x", lambda: self.parent().set_playback_speed(1.5))
-        self.speed_menu.addAction("2x", lambda: self.parent().set_playback_speed(2.0))
-        self.settings_btn.setMenu(self.speed_menu)
-
     def update_play_pause_symbol(self):
         if self.play_pause_btn.isChecked():
             self.play_pause_btn.setText("⏸")
@@ -390,6 +383,7 @@ class EmotionDashboard(QWidget):
         self.recorded_frames = []
         self.init_ui()
         self.mediapipe_btn.setChecked(True)
+        self.last_uploaded_image = None
 
     def init_ui(self):
         self.setStyleSheet("""
@@ -418,17 +412,21 @@ class EmotionDashboard(QWidget):
         face_detector_layout.setSpacing(10)
         face_detector_title = QLabel("Elige un Detector de Rostros")
         face_detector_title.setObjectName("SectionTitle")
-        face_detector_layout.addWidget(face_detector_title)
+        face_detector_layout.addWidget(face_detector_title, alignment=Qt.AlignmentFlag.AlignHCenter)
         
-        face_buttons_layout = FlowLayout()
-        face_buttons_layout.setSpacing(10)
+        face_buttons_layout = QHBoxLayout()
+        face_buttons_layout.setSpacing(20)
+        face_buttons_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         
-        self.haar_btn = ModelButton("Haar Cascade", "Ligero y rápido")
+        self.haar_btn = ModelButton("Haar Cascade", "Ligero, rápido no muy preciso")
         self.haar_btn.setProperty("model", "haar")
-        self.yolo_btn = ModelButton("YOLOv8n-face", "Optimizado para rostros, rápido y preciso")
+        self.haar_btn.setMinimumWidth(220)
+        self.yolo_btn = ModelButton("YOLOv8n-face", "Optimizado para rostros, Lento pero preciso")
         self.yolo_btn.setProperty("model", "yolo")
+        self.yolo_btn.setMinimumWidth(220)
         self.mediapipe_btn = ModelButton("MediaPipe", "Moderno y robusto")
         self.mediapipe_btn.setProperty("model", "mediapipe")
+        self.mediapipe_btn.setMinimumWidth(220)
 
         self.haar_btn.clicked.connect(lambda: self.change_model("haar"))
         self.yolo_btn.clicked.connect(lambda: self.change_model("yolo"))
@@ -687,6 +685,18 @@ class EmotionDashboard(QWidget):
                 self.mediapipe_btn.setChecked(model_name == "mediapipe")
             else:
                 QMessageBox.warning(self, "Error", f"Modelo desconocido: {model_name}")
+        # Al final de la función, reprocesa la última imagen si existe
+        if hasattr(self, 'last_uploaded_image') and self.last_uploaded_image is not None:
+            try:
+                processed = self.detector.process_frame(self.last_uploaded_image.copy())
+                processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
+                h, w, ch = processed.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(processed.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                scaled_pixmap = self.scale_image_to_label(qt_image)
+                self.image_label.setPixmap(scaled_pixmap)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error reprocesando la imagen: {str(e)}")
 
     def toggle_webcam(self):
         if self.is_webcam_active:
@@ -737,14 +747,14 @@ class EmotionDashboard(QWidget):
         scale = min(max_w / w, max_h / h, 1.0)
         if scale < 1.0:
             frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-        if self.is_webcam_active and self.is_recording and self.video_writer:
-            self.video_writer.write(frame)
+        processed_frame = self.detector.process_frame(frame)
+        if self.is_webcam_active and self.is_recording:
+            self.recorded_frames.append(processed_frame.copy())
         try:
-            frame = self.detector.process_frame(frame)
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = frame.shape
+            frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = frame_rgb.shape
             bytes_per_line = ch * w
-            qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            qt_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
             scaled_pixmap = self.scale_image_to_label(qt_image)
             self.image_label.setPixmap(scaled_pixmap)
         except Exception as e:
@@ -784,6 +794,7 @@ class EmotionDashboard(QWidget):
                 scale = min(max_w / w, max_h / h, 1.0)
                 if scale < 1.0:
                     image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+                self.last_uploaded_image = image.copy()
                 processed = self.detector.process_frame(image)
                 processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
                 h, w, ch = processed.shape
@@ -945,14 +956,13 @@ class EmotionDashboard(QWidget):
         if not self.is_webcam_active:
             return
         if not self.is_recording:
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            save_path, _ = QFileDialog.getSaveFileName(self, "Guardar Video", "video.avi", "Archivos de Video (*.avi)")
+            self.recorded_frames = []
+            self.record_start_time = time.time()
+            self.record_end_time = None
+            save_path, _ = QFileDialog.getSaveFileName(self, "Guardar Video", "video.mp4", "Archivos de Video (*.mp4)")
             if not save_path:
                 return
-            width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = int(self.cap.get(cv2.CAP_PROP_FPS)) or 30
-            self.video_writer = cv2.VideoWriter(save_path, fourcc, fps, (width, height))
+            self.record_save_path = save_path
             self.is_recording = True
             self.camera_sidebar.record_btn.setIcon(QIcon("icons/rec2.ico"))
             self.camera_sidebar.record_btn.setIconSize(QSize(32, 32))
@@ -964,11 +974,23 @@ class EmotionDashboard(QWidget):
             self.is_recording = False
             self.camera_sidebar.record_btn.setIcon(QIcon("icons/rec1.ico"))
             self.camera_sidebar.record_btn.setIconSize(QSize(32, 32))
-            if self.video_writer:
-                self.video_writer.release()
-                self.video_writer = None
+            self.record_end_time = time.time()
             self.record_time_label.hide()
             self.record_timer.stop()
+            if self.recorded_frames and self.record_save_path:
+                duration = self.record_end_time - self.record_start_time
+                duration = duration / 2  # Corrige la duplicación del tiempo
+                fps = max(1, int(round(len(self.recorded_frames) / duration)))
+                height, width, _ = self.recorded_frames[0].shape
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out = cv2.VideoWriter(self.record_save_path, fourcc, fps, (width, height))
+                for f in self.recorded_frames:
+                    out.write(f)
+                out.release()
+            self.recorded_frames = []
+            self.record_save_path = None
+            self.record_start_time = None
+            self.record_end_time = None
 
     def update_record_time(self):
         self.record_seconds += 1
@@ -981,9 +1003,15 @@ class EmotionDashboard(QWidget):
             return
         ret, frame = self.cap.read()
         if ret and frame is not None and frame.size > 0:
+            h, w = frame.shape[:2]
+            max_w, max_h = 640, 480
+            scale = min(max_w / w, max_h / h, 1.0)
+            if scale < 1.0:
+                frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            processed_frame = self.detector.process_frame(frame)
             save_path, _ = QFileDialog.getSaveFileName(self, "Guardar Imagen", "captura.jpg", "Archivos de Imagen (*.jpg *.png *.jpeg)")
             if save_path:
-                cv2.imwrite(save_path, frame)
+                cv2.imwrite(save_path, processed_frame)
 
     def position_floating_panel(self):
         w = self.width()
@@ -997,9 +1025,8 @@ class EmotionDashboard(QWidget):
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.MouseMove:
             if self.is_webcam_active:
-                pass # No need to show floating panel here
-                # self.floating_panel.show_panel()
-                # self.floating_panel.hide_timer.start()
+                pass 
+             
         return super().eventFilter(obj, event)
 
     def position_camera_sidebar(self):

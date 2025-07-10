@@ -73,6 +73,7 @@ Desktop.ini
 
 # Virtual environments
 test_env/
+compu2/
 venv/
 ENV/
 env.bak/

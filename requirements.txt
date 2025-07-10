@@ -3,12 +3,7 @@ numpy
 PyQt6
 torch
 torchvision
-PyYAML
-requests
-pandas
-seaborn
-matplotlib
-pillow
-tensorflow
+ultralytics
 deepface
 mediapipe
+pillow

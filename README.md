@@ -1,8 +1,47 @@
-# Sistema de Reconocimiento de Emociones con IA
+# Detector de Emociones
 
-Una aplicación de escritorio moderna y responsiva desarrollada en Python y PyQt6 para detectar emociones faciales en tiempo real a través de la cámara web, imágenes estáticas o archivos de video.
+**Recomendado usar Python 3.8**
 
-Este proyecto fue diseñado como una herramienta de apoyo para el entorno educativo de **SENATI**, permitiendo a los instructores obtener una mejor comprensión del estado emocional de los estudiantes.
+## Descripción
+
+Esta es una aplicación de escritorio moderna y responsiva desarrollada en Python y PyQt6 para detectar emociones faciales en tiempo real a través de la cámara web, imágenes estáticas o archivos de video.
+
+Este proyecto fue diseñado como una herramienta de apoyo para el entorno educativo, permitiendo a los instructores obtener una mejor comprensión del estado emocional de los estudiantes.
+
+## Características principales
+- Detección de emociones en imágenes, videos y cámara web.
+- Permite grabar video y tomar fotos directamente desde la cámara.
+- Interfaz gráfica moderna y fácil de usar (PyQt6).
+- Soporte para modelos de detección de rostro: Haar Cascade, YOLOv8n-face, MediaPipe.
+
+## Requisitos
+- Python 3.8 (recomendado)
+- Ver dependencias en `requirements.txt`
+
+## Uso
+1. Instala las dependencias:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Ejecuta la aplicación:
+   ```bash
+   python dashboard.py
+   ```
+
+## Funcionalidades de cámara
+- **Grabar video:** Puedes grabar video desde la cámara web y guardarlo en tu equipo.
+- **Tomar foto:** Puedes capturar una imagen desde la cámara web y guardarla como archivo.
+
+## Modelos soportados
+- Haar Cascade
+- YOLOv8n-face (requiere el archivo `yolov8n-face.pt` en el directorio del proyecto)
+- MediaPipe
+
+## Créditos
+- DeepFace
+- Ultralytics YOLO
+- MediaPipe
+- PyQt6
 
 ---
 
@@ -17,7 +56,7 @@ Este proyecto fue diseñado como una herramienta de apoyo para el entorno educat
     *   **Haar Cascade:** Rápido y ligero, ideal para hardware con recursos limitados.
     *   **YOLOv8n-face:** Optimizado para detección de rostros, recomendado para alta precisión y velocidad.
     *   **MediaPipe:** Excelente balance entre rendimiento y precisión.
-*   **Análisis de Emociones con DeepFace:** Utiliza la potente librería `DeepFace` para un análisis de emociones preciso, reconociendo 7 estados emocionales (feliz, triste, enojado, sorprendido, neutral, miedo, disgusto).
+*   **Análisis de Emociones con DeepFace:** Utiliza la librería `DeepFace` para un análisis de emociones preciso, reconociendo 7 estados emocionales (feliz, triste, enojado, sorprendido, neutral, miedo, disgusto).
 *   **Controles de Video Avanzados:** Controles de reproducción de video inspirados en YouTube, con barra de progreso, pausa, reanudación y control de tiempo.
 
 ---
@@ -39,7 +78,6 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local.
 ### 1. Prerrequisitos
 
 *   [Python 3.8](https://www.python.org/downloads/release/python-380/)
-*   [Git](https://git-scm.com/downloads)
 *   Una cámara web (para el análisis en tiempo real).
 
 ### 2. Instalación
