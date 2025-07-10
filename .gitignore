@@ -25,6 +25,11 @@ var/
 *.egg
 MANIFEST
 
+# Custom: Ignore face, yolo folders and yolov8n-face.pt file
+face/
+yolo/
+yolov8n-face.pt
+
 # Installer logs
 debug.log
 pip-log.txt

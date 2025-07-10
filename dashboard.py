@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QImage, QPixmap, QColor, QPalette, QIcon
 from PyQt6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QRect, QPoint, QSize
-
+from pathlib import Path
 from emotion_detector import EmotionDetector
 
 class FlowLayout(QLayout):
@@ -607,14 +607,39 @@ class EmotionDashboard(QWidget):
 
     def change_model(self, model_name):
         """Cambia el modelo de detección de rostros."""
-        if self.detector.change_model(model_name):
-            self.current_model = model_name
-            # Actualiza el estado visual de los botones de modelo.
-            self.haar_btn.setChecked(model_name == "haar")
-            self.yolo_btn.setChecked(model_name == "yolo")
-            self.mediapipe_btn.setChecked(model_name == "mediapipe")
+        if model_name == "yolo":
+            try:
+                from ultralytics import YOLO
+                # Cargar el modelo desde el mismo directorio que dashboard.py
+                current_dir = Path(__file__).parent
+                model_path = str(current_dir / 'yolov8n-face.pt')
+                print(f"[Dashboard] Buscando modelo YOLO en: {model_path}")
+                
+                # Si no se encuentra el modelo, mostrar un mensaje pero intentar cargar de todos modos
+                # (YOLO intentará descargarlo si no lo encuentra localmente)
+                if not Path(model_path).exists():
+                    print("[Dashboard] Modelo no encontrado, se intentará descargar...")
+                self.detector.detector = YOLO(model_path)
+                self.detector.model_type = "yolo"
+                self.current_model = "yolo"
+                self.haar_btn.setChecked(False)
+                self.yolo_btn.setChecked(True)
+                self.mediapipe_btn.setChecked(False)
+                print(f"YOLO model loaded successfully from {model_path}")
+            except Exception as e:
+                error_msg = f"No se pudo cargar yolov8n-face.pt: {str(e)}"
+                print(error_msg)
+                QMessageBox.critical(self, "Error", error_msg)
+                # Fall back to Haar if YOLO fails
+                self.change_model("haar")
         else:
-            QMessageBox.warning(self, "Error", f"Modelo desconocido: {model_name}")
+            if self.detector.change_model(model_name):
+                self.current_model = model_name
+                self.haar_btn.setChecked(model_name == "haar")
+                self.yolo_btn.setChecked(model_name == "yolo")
+                self.mediapipe_btn.setChecked(model_name == "mediapipe")
+            else:
+                QMessageBox.warning(self, "Error", f"Modelo desconocido: {model_name}")
 
     def toggle_webcam(self):
         """Inicia o detiene la captura de la cámara web."""
@@ -666,15 +691,20 @@ class EmotionDashboard(QWidget):
             return
 
         try:
+            # Process frame with the current detector
             frame = self.detector.process_frame(frame)
+            # Convert and display the frame
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = frame.shape
             bytes_per_line = ch * w
             qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
             scaled_pixmap = self.scale_image_to_label(qt_image)
             self.image_label.setPixmap(scaled_pixmap)
+            
         except Exception as e:
             print(f"Error procesando frame: {e}")
+            import traceback
+            traceback.print_exc()
             return
         
         # Actualiza el deslizador de progreso y la etiqueta de tiempo para videos.

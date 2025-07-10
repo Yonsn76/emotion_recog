@@ -15,7 +15,7 @@ Este proyecto fue diseñado como una herramienta de apoyo para el entorno educat
     *   Archivos de video (MP4, AVI).
 *   **Selección de Modelos de Detección Facial:**
     *   **Haar Cascade:** Rápido y ligero, ideal para hardware con recursos limitados.
-    *   **YOLOv5:** Alta precisión, recomendado para un seguimiento robusto.
+    *   **YOLOv8n-face:** Optimizado para detección de rostros, recomendado para alta precisión y velocidad.
     *   **MediaPipe:** Excelente balance entre rendimiento y precisión.
 *   **Análisis de Emociones con DeepFace:** Utiliza la potente librería `DeepFace` para un análisis de emociones preciso, reconociendo 7 estados emocionales (feliz, triste, enojado, sorprendido, neutral, miedo, disgusto).
 *   **Controles de Video Avanzados:** Controles de reproducción de video inspirados en YouTube, con barra de progreso, pausa, reanudación y control de tiempo.
@@ -27,7 +27,7 @@ Este proyecto fue diseñado como una herramienta de apoyo para el entorno educat
 *   **Lenguaje:** Python 3.8
 *   **Interfaz Gráfica:** PyQt6
 *   **Procesamiento de Imagen/Video:** OpenCV
-*   **Detección de Rostros:** Haar Cascade (OpenCV), YOLOv5 (PyTorch), MediaPipe
+*   **Detección de Rostros:** Haar Cascade (OpenCV), YOLOv8n-face (PyTorch/ONNX), MediaPipe
 *   **Análisis de Emociones:** DeepFace
 
 ---
@@ -69,11 +69,15 @@ Asegúrate de que tu entorno virtual esté activado y luego ejecuta:
 pip install -r requirements.txt
 ```
 
-**d. Descarga el modelo YOLOv5 (Opcional pero recomendado para alta precisión):**
 
-Si deseas utilizar el detector de rostros YOLOv5, descarga el archivo de pesos `yolov5x.pt` y colócalo en la carpeta raíz del proyecto.
+**d. Descarga el modelo YOLOv8n-face (recomendado para detección de rostros):**
 
-*   Puedes descargarlo desde la [página de releases de YOLOv5](https://github.com/ultralytics/yolov5/releases).
+Repositorio oficial: https://github.com/derronqi/yolov8-face
+Enlace de descarga directa del modelo: https://drive.usercontent.google.com/u/0/uc?id=1qcr9DbgsX3ryrz2uU8w4Xm3cOrRywXqb&export=download
+
+Coloca el archivo `yolov8n-face.pt` en la carpeta raíz del proyecto.
+
+Este modelo está optimizado específicamente para la detección de rostros y es recomendado para obtener mejores resultados.
 
 ---
 

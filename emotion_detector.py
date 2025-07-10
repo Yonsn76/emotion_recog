@@ -38,20 +38,15 @@ class EmotionDetector:
             )
         elif self.model_type == "yolo":
             try:
-                # Carga el modelo YOLOv5 desde un archivo local o de torch.hub
-                model_path = 'yolov5x.pt'
-                if not Path(model_path).exists():
-                    print(f"Modelo YOLO no encontrado en {model_path}, descargando...")
-                    self.detector = torch.hub.load('ultralytics/yolov5', 'yolov5x', pretrained=True)
-                else:
-                    self.detector = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, source='github')
+                from ultralytics import YOLO
+                # Buscar el modelo en el mismo directorio que este archivo
+                current_dir = Path(__file__).parent
+                model_path = str(current_dir / 'yolov8n-face.pt')
+                print(f"[EmotionDetector] Buscando modelo YOLO en: {model_path}")
                 
-                self.detector.classes = [0]  # Configura para detectar solo personas
-                # Realiza una inferencia inicial para calentar el modelo y evitar cuelgues.
-                _ = self.detector(torch.zeros(1, 3, 640, 640))
-            except Exception as e:
-                print(f"Error al cargar YOLOv5: {e}")
-                print("Se utilizará Haar Cascade como alternativa.")
+                # Cargar el modelo, si no existe se intentará descargar
+                self.detector = YOLO(model_path)
+            except Exception:
                 self.model_type = "haar"
                 self.detector = cv2.CascadeClassifier(
                     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -92,7 +87,6 @@ class EmotionDetector:
             return emotion, 1.0
         except Exception:
             # Si DeepFace falla (ej. rostro no claro), devuelve 'Neutral'.
-            # print(f"Advertencia en DeepFace: {e}")
             return "Neutral", 0.5
 
     def detect_faces_haar(self, frame):
@@ -104,25 +98,27 @@ class EmotionDetector:
         return faces
 
     def detect_faces_yolo(self, frame):
-        """Detecta rostros usando YOLOv5 y devuelve las coordenadas."""
+        """Detecta rostros usando YOLOv8n-face (ultralytics) y devuelve las coordenadas de los rostros."""
         results = self.detector(frame)
-        detections = results.xyxy[0].cpu().numpy()
         faces = []
-        for *box, conf, cls in detections:
-            if conf > 0.5:
-                x1, y1, x2, y2 = map(int, box)
-                w, h = x2 - x1, y2 - y1
-                faces.append((x1, y1, w, h))
+        for r in results:
+            if hasattr(r, 'boxes') and r.boxes is not None:
+                for box, conf in zip(r.boxes.xyxy.cpu().numpy(), r.boxes.conf.cpu().numpy()):
+                    if conf > 0.5:
+                        x1, y1, x2, y2 = map(int, box)
+                        w, h = x2 - x1, y2 - y1
+                        faces.append((x1, y1, w, h))
         return faces
 
     def detect_faces_mediapipe(self, frame):
         """Detecta rostros usando MediaPipe y devuelve las coordenadas."""
         if not self.mediapipe_available:
             return []
-        
+
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # El objeto FaceDetection NO es invocable, debe usarse .process()
         results = self.detector.process(img_rgb)
-        
+
         faces = []
         if results.detections:
             h, w, _ = frame.shape
@@ -135,55 +131,52 @@ class EmotionDetector:
     def process_frame(self, frame):
         """
         Procesa un frame de video o una imagen: detecta rostros y sus emociones.
-        Dibuja los resultados en el frame y lo devuelve.
+        Si el modelo es YOLO, dibuja los resultados y muestra la emoción dominante sobre cada rostro.
         """
         if frame is None or frame.size == 0:
             return frame
-            
         try:
-            if self.model_type == "haar":
+            if self.model_type == "yolo":
+                results = self.detector(frame)
+                annotated = frame.copy()
+                for box in results[0].boxes.xyxy.cpu().numpy():
+                    x1, y1, x2, y2 = map(int, box)
+                    face_img = frame[y1:y2, x1:x2]
+                    if face_img.size > 0:
+                        try:
+                            emotion = DeepFace.analyze(face_img, actions=['emotion'], enforce_detection=False)
+                            emotion_label = emotion[0]['dominant_emotion'] if isinstance(emotion, list) else emotion['dominant_emotion']
+                            emotion_label = self.emotion_translation.get(emotion_label.lower(), emotion_label)
+                            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0,255,0), 2)
+                            cv2.putText(annotated, emotion_label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+                        except Exception as e:
+                            cv2.putText(annotated, 'Error', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,0,255), 2)
+                return annotated
+            elif self.model_type == "haar":
                 faces = self.detect_faces_haar(frame)
-            elif self.model_type == "yolo":
-                faces = self.detect_faces_yolo(frame)
             elif self.model_type == "mediapipe":
                 faces = self.detect_faces_mediapipe(frame)
             else:
                 faces = []
 
             for (x, y, w, h) in faces:
-                # Asegura que las coordenadas no excedan los límites del frame.
                 h_frame, w_frame = frame.shape[:2]
                 x = max(0, min(x, w_frame - 1))
                 y = max(0, min(y, h_frame - 1))
                 w = max(1, min(w, w_frame - x))
                 h = max(1, min(h, h_frame - y))
-                
-                # Recorta el rostro para el análisis de emoción.
                 face_img = frame[y:y+h, x:x+w]
-
                 if face_img.size == 0:
                     continue
-
                 emotion, confidence = self.get_emotion(face_img)
-                
-                # Dibuja el rectángulo y el texto de la emoción en el frame.
                 color = (0, 255, 0) if confidence > 0.6 else (0, 165, 255)
                 cv2.rectangle(frame, (x, y), (x+w, y+h), color, 4)
-                
                 text = f"{emotion}"
-                
-                # Calcula el tamaño del texto para el fondo.
                 (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
-                
-                # Dibuja un fondo oscuro para el texto.
                 cv2.rectangle(frame, (x, y - text_height - 15), (x + text_width, y), (0, 0, 0), -1)
-                
-                # Dibuja el texto de la emoción.
                 cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 4)
-
-        except Exception as e:
-            print(f"Error procesando frame: {e}")
-            
+        except Exception:
+            return frame
         return frame
 
     def change_model(self, model_name):
