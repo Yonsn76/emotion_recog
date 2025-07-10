@@ -110,9 +110,14 @@ pip install -r requirements.txt
 
 **d. Descarga el modelo YOLOv8n-face (recomendado para detección de rostros):**
 
-Repositorio oficial: https://github.com/derronqi/yolov8-face
-Enlace de descarga directa del modelo: https://drive.usercontent.google.com/u/0/uc?id=1qcr9DbgsX3ryrz2uU8w4Xm3cOrRywXqb&export=download
-
+Repositorio oficial:
+```bash
+https://github.com/derronqi/yolov8-face
+```
+Enlace de descarga directa del modelo: 
+```bash
+https://drive.usercontent.google.com/u/0/uc?id=1qcr9DbgsX3ryrz2uU8w4Xm3cOrRywXqb&export=download
+```
 Coloca el archivo `yolov8n-face.pt` en la carpeta raíz del proyecto.
 
 Este modelo está optimizado específicamente para la detección de rostros y es recomendado para obtener mejores resultados.
