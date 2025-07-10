@@ -4,7 +4,7 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QFileDialog, 
     QHBoxLayout, QFrame, QMessageBox, QSizePolicy, QGraphicsDropShadowEffect,
-    QSlider, QLayout
+    QSlider, QLayout, QScrollArea
 )
 from PyQt6.QtGui import QImage, QPixmap, QColor, QPalette, QIcon
 from PyQt6.QtCore import QTimer, Qt, QPropertyAnimation, QEasingCurve, QRect, QPoint, QSize
@@ -355,22 +355,30 @@ class EmotionDashboard(QWidget):
             }
             QFrame#PreviewSection {
                 background-color: #2a2a2a;
-                padding: 15px;
+                padding: 5px;
                 margin: 0px;
                 border-radius: 8px;
                 border: 1px solid #333333;
             }
             QLabel#PreviewImage {
-                background-color: #2a2a2a;
+                background-color: #1a1a1a;
                 border-radius: 8px;
-                border: none;
-                padding: 0px;
+                border: 2px solid #444444;
+                padding: 2px;
                 margin: 0px;
+                min-height: 600px;
             }
         """)
 
-        # Layout principal
-        self.layout = QVBoxLayout()
+
+        # --- Scroll Area para el layout principal ---
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        # Widget contenedor para el contenido principal
+        self.main_widget = QWidget()
+        self.layout = QVBoxLayout(self.main_widget)
         self.layout.setSpacing(15)
         self.layout.setContentsMargins(25, 15, 25, 15)
 
@@ -417,7 +425,7 @@ class EmotionDashboard(QWidget):
         emotion_title = QLabel("Detector de Emociones")
         emotion_title.setObjectName("SectionTitle")
         
-        emotion_model_label = QLabel("DeepFace (Análisis de Emociones Real)")
+        emotion_model_label = QLabel("DeepFace")
         emotion_model_label.setStyleSheet("""
             color: #FFFFFF; 
             font-size: 15px; 
@@ -457,6 +465,7 @@ class EmotionDashboard(QWidget):
         input_layout.addLayout(input_buttons_layout)
         collapsible_controls_layout.addWidget(input_section)
 
+
         # Añade el contenedor de controles al layout principal.
         self.layout.addWidget(self.collapsible_controls_frame)
 
@@ -476,24 +485,27 @@ class EmotionDashboard(QWidget):
         """)
         self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_button.clicked.connect(self.toggle_top_controls)
+
         self.layout.addWidget(self.toggle_button)
 
         # --- Área de Previsualización ---
         self.preview_frame = QFrame()
         self.preview_frame.setObjectName("PreviewSection")
         preview_layout = QVBoxLayout(self.preview_frame)
-        preview_layout.setSpacing(10)
-        preview_layout.setContentsMargins(10, 10, 10, 10)
+        preview_layout.setSpacing(5)
+        preview_layout.setContentsMargins(5, 5, 5, 5)
         self.image_label = QLabel()
         self.image_label.setObjectName("PreviewImage")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setMinimumSize(400, 300)
-        preview_layout.addWidget(self.image_label)
+        self.image_label.setMinimumSize(800, 600)
+        self.image_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.image_label.setScaledContents(False)  # Mantener aspecto
+        preview_layout.addWidget(self.image_label, 1)  # Stretch factor 1 para expandir
         
         # Añade los controles de video con el nuevo diseño.
         self.video_controls = VideoControls()
         self.video_controls.setVisible(False)
-        preview_layout.addWidget(self.video_controls)
+        preview_layout.addWidget(self.video_controls, 0)  # No stretch para controles
         
         # Conecta las señales de los controles de video.
         self.video_controls.play_pause_btn.clicked.connect(self.toggle_play_pause)
@@ -503,9 +515,16 @@ class EmotionDashboard(QWidget):
         self.video_controls.progress_slider.sliderMoved.connect(self.seek_video)
         self.video_controls.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
         
+
         self.layout.addWidget(self.preview_frame, 1)
-        self.setLayout(self.layout)
-        self.setMinimumSize(850, 650)
+
+        # Configura el scroll area
+        self.scroll_area.setWidget(self.main_widget)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.scroll_area)
+        self.setLayout(main_layout)
+        self.setMinimumSize(1200, 800)  # Tamaño mínimo más grande
 
         # --- Animación para los controles superiores ---
         self.animation = QPropertyAnimation(self.collapsible_controls_frame, b"maximumHeight")
@@ -604,18 +623,33 @@ class EmotionDashboard(QWidget):
         else:
             self._stop_current_media()
 
-            self.cap = cv2.VideoCapture(0)
-            if not self.cap.isOpened():
-                QMessageBox.warning(self, "Error", "No se pudo acceder a la cámara")
-                return
-            self.is_webcam_active = True
-            self.webcam_btn.setText("Detener Cámara")
-            self.timer.start(30)
-            self.video_controls.setVisible(False)
+            try:
+                self.cap = cv2.VideoCapture(0)
+                if not self.cap.isOpened():
+                    QMessageBox.warning(self, "Error", "No se pudo acceder a la cámara")
+                    return
+                    
+                # Configurar resolución de la cámara
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                
+                self.is_webcam_active = True
+                self.webcam_btn.setText("Detener Cámara")
+                self.timer.start(30)
+                self.video_controls.setVisible(False)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error accediendo a la cámara: {str(e)}")
+                if self.cap:
+                    self.cap.release()
+                    self.cap = None
 
     def update_frame(self):
         """Se ejecuta con cada tick del QTimer para procesar y mostrar un nuevo frame."""
         if self.video_paused and not self.is_webcam_active:
+            return
+            
+        if not self.cap or not self.cap.isOpened():
+            self.timer.stop()
             return
             
         ret, frame = self.cap.read()
@@ -631,35 +665,38 @@ class EmotionDashboard(QWidget):
         if frame is None or frame.size == 0:
             return
 
-        frame = self.detector.process_frame(frame)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = frame.shape
-        bytes_per_line = ch * w
-        qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-        pixmap = QPixmap.fromImage(qt_image)
-        self.image_label.setPixmap(pixmap.scaled(
-            self.image_label.size(), 
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        ))
+        try:
+            frame = self.detector.process_frame(frame)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = frame.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            scaled_pixmap = self.scale_image_to_label(qt_image)
+            self.image_label.setPixmap(scaled_pixmap)
+        except Exception as e:
+            print(f"Error procesando frame: {e}")
+            return
         
         # Actualiza el deslizador de progreso y la etiqueta de tiempo para videos.
         if self.cap and self.total_frames > 0 and not self.is_webcam_active:
-            self.current_frame = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
-            
-            # Actualiza el deslizador.
-            progress = int((self.current_frame / self.total_frames) * 100) if self.total_frames > 0 else 0
-            self.video_controls.progress_slider.setValue(progress)
+            try:
+                self.current_frame = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+                
+                # Actualiza el deslizador.
+                progress = int((self.current_frame / self.total_frames) * 100) if self.total_frames > 0 else 0
+                self.video_controls.progress_slider.setValue(progress)
 
-            # Actualiza la etiqueta de tiempo.
-            if self.video_fps > 0:
-                current_sec = self.current_frame / self.video_fps
-                total_sec = self.total_frames / self.video_fps
-                
-                current_time_str = f"{int(current_sec // 60):02}:{int(current_sec % 60):02}"
-                total_time_str = f"{int(total_sec // 60):02}:{int(total_sec % 60):02}"
-                
-                self.video_controls.time_label.setText(f"{current_time_str} / {total_time_str}")
+                # Actualiza la etiqueta de tiempo.
+                if self.video_fps > 0:
+                    current_sec = self.current_frame / self.video_fps
+                    total_sec = self.total_frames / self.video_fps
+                    
+                    current_time_str = f"{int(current_sec // 60):02}:{int(current_sec % 60):02}"
+                    total_time_str = f"{int(total_sec // 60):02}:{int(total_sec % 60):02}"
+                    
+                    self.video_controls.time_label.setText(f"{current_time_str} / {total_time_str}")
+            except Exception as e:
+                print(f"Error actualizando controles de video: {e}")
 
     def upload_image(self):
         """Abre un diálogo para que el usuario seleccione una imagen y la procesa."""
@@ -673,22 +710,21 @@ class EmotionDashboard(QWidget):
         )
         
         if file_path:
-            image = cv2.imread(file_path)
-            if image is None:
-                QMessageBox.warning(self, "Error", "No se pudo cargar la imagen")
-                return
-            
-            processed = self.detector.process_frame(image)
-            processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
-            h, w, ch = processed.shape
-            bytes_per_line = ch * w
-            qt_image = QImage(processed.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(qt_image)
-            self.image_label.setPixmap(pixmap.scaled(
-                self.image_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            try:
+                image = cv2.imread(file_path)
+                if image is None:
+                    QMessageBox.warning(self, "Error", "No se pudo cargar la imagen")
+                    return
+                
+                processed = self.detector.process_frame(image)
+                processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
+                h, w, ch = processed.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(processed.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                scaled_pixmap = self.scale_image_to_label(qt_image)
+                self.image_label.setPixmap(scaled_pixmap)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error procesando la imagen: {str(e)}")
 
     def upload_video(self):
         """Abre un diálogo para que el usuario seleccione un video y comienza la reproducción."""
@@ -702,24 +738,41 @@ class EmotionDashboard(QWidget):
         )
         
         if file_path:
-            self.is_webcam_active = False
-            self.cap = cv2.VideoCapture(file_path)
-            if not self.cap.isOpened():
-                QMessageBox.warning(self, "Error", "No se pudo cargar el video")
-                return
+            try:
+                self.is_webcam_active = False
+                self.cap = cv2.VideoCapture(file_path)
+                if not self.cap.isOpened():
+                    QMessageBox.warning(self, "Error", "No se pudo cargar el video")
+                    return
+                    
+                # Obtiene las propiedades del video.
+                self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.video_fps = self.cap.get(cv2.CAP_PROP_FPS)
                 
-            # Obtiene las propiedades del video.
-            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.video_fps = self.cap.get(cv2.CAP_PROP_FPS)
-            self.current_frame = 0
-            self.video_controls.progress_slider.setValue(0)
-            
-            self.webcam_btn.setText("Activar Cámara")
-            self.video_controls.setVisible(True)
-            self.video_paused = False
-            self.video_controls.play_pause_btn.setChecked(True)
-            self.video_controls.update_play_pause_symbol()
-            self.timer.start(int(1000 / self.video_fps) if self.video_fps > 0 else 30)
+                # Validación de propiedades del video
+                if self.total_frames <= 0:
+                    QMessageBox.warning(self, "Error", "El archivo de video parece estar corrupto")
+                    self.cap.release()
+                    self.cap = None
+                    return
+                    
+                if self.video_fps <= 0:
+                    self.video_fps = 30  # FPS por defecto
+                
+                self.current_frame = 0
+                self.video_controls.progress_slider.setValue(0)
+                
+                self.webcam_btn.setText("Activar Cámara")
+                self.video_controls.setVisible(True)
+                self.video_paused = False
+                self.video_controls.play_pause_btn.setChecked(True)
+                self.video_controls.update_play_pause_symbol()
+                self.timer.start(int(1000 / self.video_fps))
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error cargando el video: {str(e)}")
+                if self.cap:
+                    self.cap.release()
+                    self.cap = None
 
     def toggle_play_pause(self):
         """Pausa o reanuda la reproducción del video."""
@@ -743,8 +796,17 @@ class EmotionDashboard(QWidget):
             self.video_controls.play_pause_btn.setChecked(False)
             self.video_controls.update_play_pause_symbol()
             # Muestra el primer frame.
-            self.update_frame()
-            self.video_paused = True
+            ret, frame = self.cap.read()
+            if ret and frame is not None and frame.size > 0:
+                frame = self.detector.process_frame(frame)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = frame.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                scaled_pixmap = self.scale_image_to_label(qt_image)
+                self.image_label.setPixmap(scaled_pixmap)
+            # Resetea la posición después de mostrar el primer frame
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
 
     def rewind_video(self):
@@ -779,6 +841,40 @@ class EmotionDashboard(QWidget):
         if self.cap:
             self.cap.release()
         event.accept()
+
+    def resizeEvent(self, event):
+        """Se ejecuta cuando la ventana cambia de tamaño para redimensionar la imagen."""
+        super().resizeEvent(event)
+        # Si hay una imagen cargada y tenemos el pixmap original, la reescala
+        if (hasattr(self, '_original_pixmap') and 
+            self._original_pixmap and not self._original_pixmap.isNull()):
+            scaled_pixmap = self._original_pixmap.scaled(
+                self.image_label.size() - QSize(10, 10),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.image_label.setPixmap(scaled_pixmap)
+
+    def scale_image_to_label(self, qt_image):
+        """Escala la imagen para que ocupe el máximo espacio disponible manteniendo la proporción."""
+        pixmap = QPixmap.fromImage(qt_image)
+        
+        # Guarda el pixmap original para redimensionamiento posterior
+        self._original_pixmap = pixmap
+        
+        # Obtiene el tamaño disponible del label (con un pequeño margen)
+        available_size = self.image_label.size()
+        margin = 10
+        target_size = QSize(available_size.width() - margin, available_size.height() - margin)
+        
+        # Escala la imagen manteniendo la proporción
+        scaled_pixmap = pixmap.scaled(
+            target_size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        
+        return scaled_pixmap
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

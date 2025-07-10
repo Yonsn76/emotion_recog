@@ -41,8 +41,11 @@ class EmotionDetector:
                 # Carga el modelo YOLOv5 desde un archivo local o de torch.hub
                 model_path = 'yolov5x.pt'
                 if not Path(model_path).exists():
-                    raise FileNotFoundError(f"No se encontró el modelo YOLO en {model_path}")
-                self.detector = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, source='github')
+                    print(f"Modelo YOLO no encontrado en {model_path}, descargando...")
+                    self.detector = torch.hub.load('ultralytics/yolov5', 'yolov5x', pretrained=True)
+                else:
+                    self.detector = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, source='github')
+                
                 self.detector.classes = [0]  # Configura para detectar solo personas
                 # Realiza una inferencia inicial para calentar el modelo y evitar cuelgues.
                 _ = self.detector(torch.zeros(1, 3, 640, 640))
@@ -134,42 +137,53 @@ class EmotionDetector:
         Procesa un frame de video o una imagen: detecta rostros y sus emociones.
         Dibuja los resultados en el frame y lo devuelve.
         """
-        if self.model_type == "haar":
-            faces = self.detect_faces_haar(frame)
-        elif self.model_type == "yolo":
-            faces = self.detect_faces_yolo(frame)
-        elif self.model_type == "mediapipe":
-            faces = self.detect_faces_mediapipe(frame)
-        else:
-            faces = []
+        if frame is None or frame.size == 0:
+            return frame
+            
+        try:
+            if self.model_type == "haar":
+                faces = self.detect_faces_haar(frame)
+            elif self.model_type == "yolo":
+                faces = self.detect_faces_yolo(frame)
+            elif self.model_type == "mediapipe":
+                faces = self.detect_faces_mediapipe(frame)
+            else:
+                faces = []
 
-        for (x, y, w, h) in faces:
-            # Asegura que las coordenadas no excedan los límites del frame.
-            x, y, w, h = max(0, x), max(0, y), max(0, w), max(0, h)
-            
-            # Recorta el rostro para el análisis de emoción.
-            face_img = frame[y:y+h, x:x+w]
+            for (x, y, w, h) in faces:
+                # Asegura que las coordenadas no excedan los límites del frame.
+                h_frame, w_frame = frame.shape[:2]
+                x = max(0, min(x, w_frame - 1))
+                y = max(0, min(y, h_frame - 1))
+                w = max(1, min(w, w_frame - x))
+                h = max(1, min(h, h_frame - y))
+                
+                # Recorta el rostro para el análisis de emoción.
+                face_img = frame[y:y+h, x:x+w]
 
-            if face_img.size == 0:
-                continue
+                if face_img.size == 0:
+                    continue
 
-            emotion, confidence = self.get_emotion(face_img)
-            
-            # Dibuja el rectángulo y el texto de la emoción en el frame.
-            color = (0, 255, 0) if confidence > 0.6 else (0, 165, 255)
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-            
-            text = f"{emotion}"
-            
-            # Calcula el tamaño del texto para el fondo.
-            (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)
-            
-            # Dibuja un fondo oscuro para el texto.
-            cv2.rectangle(frame, (x, y - text_height - 10), (x + text_width, y), (0, 0, 0), -1)
-            
-            # Dibuja el texto de la emoción.
-            cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                emotion, confidence = self.get_emotion(face_img)
+                
+                # Dibuja el rectángulo y el texto de la emoción en el frame.
+                color = (0, 255, 0) if confidence > 0.6 else (0, 165, 255)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 4)
+                
+                text = f"{emotion}"
+                
+                # Calcula el tamaño del texto para el fondo.
+                (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 4)
+                
+                # Dibuja un fondo oscuro para el texto.
+                cv2.rectangle(frame, (x, y - text_height - 15), (x + text_width, y), (0, 0, 0), -1)
+                
+                # Dibuja el texto de la emoción.
+                cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 4)
 
+        except Exception as e:
+            print(f"Error procesando frame: {e}")
+            
         return frame
 
     def change_model(self, model_name):
